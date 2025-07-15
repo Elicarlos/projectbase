@@ -4,11 +4,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from . models import Customer
 from .services import StripeService
-from django.config import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+
 
 
 class CreateCheckoutSessionView(APIView):
-    permission_classes = ['permission.IsAuthenticated']
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = request.user
