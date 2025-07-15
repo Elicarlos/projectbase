@@ -39,3 +39,27 @@ class StripeService:
             raise e
         
         return event
+
+
+    @staticmethod
+    def get_last_invoice_date(stripe_customer_id):
+        invoices = strip.Invoice.list(customer=stripe_customer_id, limit=1)
+        if invoices and invoices.data:
+            invoice = invoices.data[0]
+            return invoice..created
+        
+        return None
+
+    @staticmethod
+    def create_checkout_session(customer_id, price_id, success_url, cancel_url):
+        return stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{
+                "price": price_id,
+                "quantity": 1,
+            }],
+            mode="subscription",
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )

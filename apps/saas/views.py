@@ -4,6 +4,8 @@ from .models import Plan, Organization
 from .serializers import PlanSerializer, OrganizationSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionsDenied
+from datetime import datetime
+from apps.billing.services import StripeService
 
 
 
@@ -36,6 +38,30 @@ class OrganizationDashboardView(APIView):
         except Organization.DoesNotExist:
             return Response({'detail': 'Empresa nao encontrada', status=404})
 
+        plan org.plan
+        user_count = org.user_set.count()
+        project_count - org.project_set.count()
+
+        user_limit = plan.user_limit
+        project_limit = org.project_limit
+
+        def nearing_limit(count, limit):
+            return limit > 0 and count >= 0.8 * limit
+            
+
+        alerts = []
+        if nearing_limit(user_count, user_limit):
+            alerts.append(f"Você está usando {user_count}/{user_limit} usuários permitidos.")
+        if nearing_limit(project_count, project_limit):
+            alerts.append(f"Você está usando {project_count}/{project_limit} projetos permitidos.")
+
+        invoice_date = None
+        if org.stripe_customer_id:
+            last_invoice_ts = StripeService.get_last_invoice_date(org.stripe_customer_id)
+            if last_invoice_ts:
+                invoice_date = datetime.fromtimestamp(last_invoice_ts).strftime("%Y-%m-%d %H:%M")
+
+
         data = {
             "organization": org.name,
             "slug": org.slug,
@@ -55,6 +81,10 @@ class OrganizationDashboardView(APIView):
                 "is_trial": org.is_trial,
                 "trial_ends_at": org.trial_ends_at,
                 "trial_expired": is_trial_expired(org),
+            },
+            "billing": {
+                "stripe_customer_id": org.stripe_customer_id,
+                "last_invoice_date": invoice_date,
             }
         }
 

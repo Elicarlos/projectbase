@@ -69,3 +69,26 @@ def stripe_webhook(request):
     return Response(status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_upgrade_session(request):
+    user = request.user 
+    org = user.organizantion
+    customer_id = org.stripe_custumer_id
+
+    price_key = request.data.get('price_key')
+    price_id = settings.STRIPE_PRICE_IDS.get(price_key)
+
+    if not price_id:
+        return Response({"error": "Invalid price key"}, status=400)
+
+    session = StripeService.create_checkout_session(
+        customer_id=customer_id,
+        price_id=price_id,
+        success_url=settings.STRIPE_SUCCESS_URL,
+        cancel_url=settings.STRIPE_CANCEL_URL,
+    )
+
+    return Response({"checkout_url": session.url})
+
+
