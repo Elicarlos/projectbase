@@ -71,6 +71,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+MIDDLEWARE += [
+    "apps.saas.middleware.OrganizationStatusMiddleware",
+]
+
 # ------------------------------------------------------------------------------
 # URLS & WSGI / ASGI
 # ------------------------------------------------------------------------------
