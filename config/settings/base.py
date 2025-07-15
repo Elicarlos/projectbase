@@ -1,9 +1,8 @@
 # config/settings/base.py
 
-import os
 from pathlib import Path
+
 from decouple import config
-from decouple import Csv
 
 # ------------------------------------------------------------------------------
 # PATHS
@@ -32,7 +31,6 @@ INSTALLED_APPS = [
     "apps.billing",
     "apps.core",
     "apps.saas",
-
     "rest_framework",
     "rest_framework_simplejwt",
 ]
@@ -40,13 +38,13 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 
-STRIPE_SECRET_KEY      = config("STRIPE_SECRET_KEY")
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
-STRIPE_WEBHOOK_SECRET  = config("STRIPE_WEBHOOK_SECRET")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET")
 
 STRIPE_PRICE_IDS = {
     "basic_monthly": config("STRIPE_PRICE_BASIC_MONTHLY"),
-    "pro_annual":    config("STRIPE_PRICE_PRO_ANNUAL"),
+    "pro_annual": config("STRIPE_PRICE_PRO_ANNUAL"),
 }
 
 REST_FRAMEWORK = {
@@ -72,7 +70,7 @@ MIDDLEWARE = [
 ]
 
 MIDDLEWARE += [
-    "apps.saas.middleware.OrganizationStatusMiddleware",
+    "apps.saas.middleware.CurrentOrganizationMiddleware",
 ]
 
 # ------------------------------------------------------------------------------

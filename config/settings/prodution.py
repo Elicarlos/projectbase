@@ -1,9 +1,10 @@
 # config/settings/production.py
 
+
+from decouple import Csv, config
+
 from .base import *
-import os
-from decouple import config
-from decouple import Csv
+
 # ------------------------------------------------------------------------------
 # PRODUCTION SETTINGS
 # ------------------------------------------------------------------------------
@@ -11,9 +12,9 @@ DEBUG = False
 
 # Permite hosts definidos por variável de ambiente (ex.: "meu.domínio.com,www.domínio.com")
 ALLOWED_HOSTS = config(
-    "ALLOWED_HOSTS",            # nome da variável no .env
+    "ALLOWED_HOSTS",  # nome da variável no .env
     default="localhost,127.0.0.1",
-    cast=Csv()                  # converte CSV em lista de strings
+    cast=Csv(),  # converte CSV em lista de strings
 )
 
 # Chave secreta em variável de ambiente

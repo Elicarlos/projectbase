@@ -1,66 +1,96 @@
-from django.shortcuts import render
-from rest_framework import viewsets
-from .models import Plan, Organization
-from .serializers import PlanSerializer, OrganizationSerializer
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionsDenied
 from datetime import datetime
+
+from rest_framework import permissions, viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from apps.billing.services import StripeService
 
+from .models import Organization, Plan, Project, Task
+from .permissions import IsOrganizationAdmin, IsOrganizationMember
+from .serializers import (
+    OrganizationSerializer,
+    PlanSerializer,
+    ProjectSerializer,
+    TaskSerializer,
+)
+from .utils import can_create_project, is_trial_expired
 
 
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Plan.objects.filter(is_active=True)
-    serializer_classs = PlanSerializer
+    serializer_class = PlanSerializer
     permission_classes = [permissions.AllowAny]
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
-    queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return Organization.objects.filter(owner=self.request.user)
+
+    def get_permissions(self):
+        if self.action in ["update", "partial_update", "destroy"]:
+            self.permission_classes = [IsOrganizationAdmin]
+        else:
+            self.permission_classes = [IsOrganizationMember]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
-        org = self.request.user.organization
-        if not can_create_project(org):
-            raise PermissionsDenied('Limite de Projetos Atingidos')
+        # This viewset is for managing the Organization itself, not Projects.
+        # The can_create_project logic should be in a Project creation view.
+        # For Organization creation, we need to ensure the user doesn't already own one.
+        if Organization.objects.filter(owner=self.request.user).exists():
+            raise PermissionDenied("Você já possui uma organização.")
+        organization = serializer.save(owner=self.request.user)
+        # Create Stripe customer for the organization
+        stripe_customer = StripeService.create_customer(organization)
+        organization.stripe_customer_id = stripe_customer.id
+        organization.save()
 
-        serializer.save(organization=org)
 
 class OrganizationDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOrganizationMember]
 
     def get(self, request):
         try:
-            org = Organization.objects.get(owner=request.user)
+            org = request.organization  # Use the organization from middleware
 
-        except Organization.DoesNotExist:
-            return Response({'detail': 'Empresa nao encontrada', status=404})
+        except AttributeError:  # If middleware didn't set it
+            return Response(
+                {"detail": "Organização não encontrada"}, status=404
+            )
 
-        plan org.plan
+        plan = org.plan
         user_count = org.user_set.count()
-        project_count - org.project_set.count()
+        project_count = org.project_set.count()
 
         user_limit = plan.user_limit
         project_limit = org.project_limit
 
         def nearing_limit(count, limit):
             return limit > 0 and count >= 0.8 * limit
-            
 
         alerts = []
         if nearing_limit(user_count, user_limit):
-            alerts.append(f"Você está usando {user_count}/{user_limit} usuários permitidos.")
+            alerts.append(
+                f"Você está usando {user_count}/{user_limit} usuários permitidos."
+            )
         if nearing_limit(project_count, project_limit):
-            alerts.append(f"Você está usando {project_count}/{project_limit} projetos permitidos.")
+            alerts.append(
+                f"Você está usando {project_count}/{project_limit} projetos permitidos."
+            )
 
         invoice_date = None
         if org.stripe_customer_id:
-            last_invoice_ts = StripeService.get_last_invoice_date(org.stripe_customer_id)
+            last_invoice_ts = StripeService.get_last_invoice_date(
+                org.stripe_customer_id
+            )
             if last_invoice_ts:
-                invoice_date = datetime.fromtimestamp(last_invoice_ts).strftime("%Y-%m-%d %H:%M")
-
+                invoice_date = datetime.fromtimestamp(
+                    last_invoice_ts
+                ).strftime("%Y-%m-%d %H:%M")
 
         data = {
             "organization": org.name,
@@ -85,9 +115,51 @@ class OrganizationDashboardView(APIView):
             "billing": {
                 "stripe_customer_id": org.stripe_customer_id,
                 "last_invoice_date": invoice_date,
-            }
+            },
         }
 
         return Response(data)
 
 
+class ProjectViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectSerializer
+
+    def get_queryset(self):
+        return Project.objects_in_org.get_queryset(self.request.organization)
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            self.permission_classes = [IsOrganizationAdmin]
+        else:
+            self.permission_classes = [IsOrganizationMember]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        org = self.request.organization
+        if not can_create_project(org):
+            raise PermissionDenied(
+                "Limite de projetos atingido para esta organização."
+            )
+        serializer.save(organization=org)
+
+
+class TaskViewSet(viewsets.ModelViewSet):
+    serializer_class = TaskSerializer
+
+    def get_queryset(self):
+        # Ensure tasks are filtered by the project's organization
+        return Task.objects_in_org.get_queryset(self.request.organization)
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            self.permission_classes = [IsOrganizationAdmin]
+        else:
+            self.permission_classes = [IsOrganizationMember]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        # Ensure the project belongs to the user's organization
+        project = serializer.validated_data.get("project")
+        if project and project.organization != self.request.organization:
+            raise PermissionDenied("O projeto não pertence à sua organização.")
+        serializer.save()

@@ -2,5 +2,5 @@ from django.core.exception import ValidationError
 
 
 def validation_positive(value):
-    if valeu <= 0:
+    if not value.isalnum():
         raise ValidationError("O valor deve ser maior que zero")

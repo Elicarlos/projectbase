@@ -1,12 +1,14 @@
-from django.db import models
 import uuid
+
+from django.db import models
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        abstratc = True
+        abstract = True
 
 
 class UUIDModel(models.Model):
@@ -16,6 +18,6 @@ class UUIDModel(models.Model):
         abstract = True
 
 
-class BaseModel(UUIDField, TimeStampedModel):
+class BaseModel(UUIDModel, TimeStampedModel):
     class Meta:
         abstract = True

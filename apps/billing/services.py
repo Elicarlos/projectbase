@@ -3,26 +3,28 @@ from django.conf import settings
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 class StripeService:
     @staticmethod
-    def create_customer(user):
+    def create_customer(organization):
         customer = stripe.Customer.create(
-            email = user.email,
-            name = f"{user.first_name} {user.last_name}",
-            metadata = {'user_id': user.id}
+            email=organization.owner.email,
+            name=organization.name,
+            metadata={"organization_id": str(organization.id)},
         )
 
         return customer
 
-
     @staticmethod
-    def create_payment_method(customer_id, price_id, success_url, cancel_url):
+    def create_payment_method(
+        self, customer_id, price_id, success_url, cancel_url
+    ):
         session = stripe.checkout.Session.create(
-            customer = customer_id,
-            payment_method_types = ['card'],
-            line_items = [{price: price_id, quantity: 1}],
-            mode = 'payment',
-            success_url= success_url,
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": price_id, "quantity": 1}],
+            mode="payment",
+            success_url=success_url,
             cancel_url=cancel_url,
         )
 
@@ -37,28 +39,31 @@ class StripeService:
 
         except (ValueError, stripe.error.SignatureVerificationError) as e:
             raise e
-        
-        return event
 
+        return event
 
     @staticmethod
     def get_last_invoice_date(stripe_customer_id):
-        invoices = strip.Invoice.list(customer=stripe_customer_id, limit=1)
+        invoices = stripe.Invoice.list(customer=stripe_customer_id, limit=1)
         if invoices and invoices.data:
             invoice = invoices.data[0]
-            return invoice..created
-        
+            return invoice.created
+
         return None
 
     @staticmethod
-    def create_checkout_session(customer_id, price_id, success_url, cancel_url):
+    def create_checkout_session(
+        customer_id, price_id, success_url, cancel_url
+    ):
         return stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
-            line_items=[{
-                "price": price_id,
-                "quantity": 1,
-            }],
+            line_items=[
+                {
+                    "price": price_id,
+                    "quantity": 1,
+                }
+            ],
             mode="subscription",
             success_url=success_url,
             cancel_url=cancel_url,

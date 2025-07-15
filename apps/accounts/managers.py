@@ -1,5 +1,6 @@
 from django.contrib.auth.models import BaseUserManager
 
+
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -15,7 +16,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser precisa ter is_staff=True.")
-        
+
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser precisa ter is_superuser=True.")
 
