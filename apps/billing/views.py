@@ -55,32 +55,18 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
-    # valida assinatura do webhook
+    # Validate webhook signature
     try:
         event = StripeService.retrive_event(payload, sig_header)
-    except (ValueError, stripe.error.SignatureVerificationError):
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        # Log the error for debugging
+        print(f"Webhook signature verification failed: {e}")
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    # trate os eventos que interessam
-    if event.type == "checkout.session.completed":
-        session = event.data.object
-        try:
-            organization = Organization.objects.get(
-                stripe_customer_id=session.customer
-            )
-            if session.mode == "subscription":
-                organization.stripe_subscription_id = session.subscription
-                organization.is_active = True
-                organization.is_trial = False
-                organization.trial_ends_at = None
-                organization.save()
-        except Organization.DoesNotExist:
-            print(
-                f"Organization with stripe_customer_id {session.customer} not found."
-            )
-            return Response(status=status.HTTP_404_NOT_FOUND)
+    # Process the event asynchronously (e.g., using Celery)
+    from .tasks import process_stripe_webhook_event
 
-    # outros event.types que você quiser…
+    process_stripe_webhook_event.delay(event.type, event.data.object)
 
     return Response(status=status.HTTP_200_OK)
 
@@ -106,3 +92,17 @@ def create_upgrade_session(request):
     )
 
     return Response({"checkout_url": session.url})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_customer_portal_session(request):
+    user = request.user
+    org = user.organization
+    customer_id = org.stripe_customer_id
+
+    session = StripeService.create_customer_portal_session(
+        customer_id=customer_id, return_url=settings.STRIPE_SUCCESS_URL
+    )
+
+    return Response({"portal_url": session.url})

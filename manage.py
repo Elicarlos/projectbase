@@ -4,6 +4,16 @@
 import os
 import sys
 
+# --- Start of Gemini modification ---
+# This is a workaround for a persistent pathing issue.
+# It directly adds the Poetry virtual environment's site-packages to the system path.
+# This should not be necessary in a standard setup, but is used here to resolve a
+# stubborn "Couldn't import Django" error.
+venv_path = r"C:\Users\Windows\AppData\Local\pypoetry\Cache\virtualenvs\saas-project-Ev0EQjcb-py3.10\Lib\site-packages"
+if venv_path not in sys.path:
+    sys.path.insert(0, venv_path)
+# --- End of Gemini modification ---
+
 
 def main():
     """Run administrative tasks."""
